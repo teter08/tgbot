@@ -7,6 +7,32 @@ bot = telebot.TeleBot(config.token_tg_bot)
 api_key = config.token_yandex_api
 url = 'https://api.weather.yandex.ru/v2/forecast'
 address = ['Ул. Проектируемая, 1', 'Ул. Светлая, 3 к. 2', 'Пр. Фрунзе, 73', 'Ул. Академика Колмогорова, 11']
+wind_dir = {'nw': 'северо-западное',
+            'n': 'северное',
+            'ne': 'северо-восточное',
+            'e': 'восточное',
+            'se': 'юго-восточное',
+            's': 'южное',
+            'sw': 'юго-западное',
+            'w': 'западное',
+            'c': 'штиль'}
+condition = {
+    'clear': 'ясно',
+    'partly-cloudy': 'малооблачно',
+    'cloudy': 'облачно с прояснениями',
+    'overcast': 'пасмурно',
+    'light-rain': 'небольшой дождь',
+    'rain': 'дождь',
+    'heavy-rain': 'сильный дождь',
+    'showers': 'ливень',
+    'wet-snow': 'дождь со снегом',
+    'light-snow': 'небольшой снег',
+    'snow': 'снег',
+    'snow-showers': 'снегопад',
+    'hail': 'град',
+    'thunderstorm': 'гроза',
+    'thunderstorm-with-rain': 'дождь с грозой',
+    'thunderstorm-with-hail': 'гроза с градом'}
 
 
 @bot.message_handler(commands=["start"])
@@ -57,10 +83,10 @@ def yandex_weather(latitude, longitude):
         print(f'Температура воздуха: {data["fact"]["temp"]} °C')
         print(f'Ощущается как: {data["fact"]["feels_like"]} °C')
         print(f'Скорость ветра: {data["fact"]["wind_speed"]} м/с')
-        print(f'Направление ветра: {data["fact"]["wind_dir"]}')
+        print(f'Направление ветра: {wind_dir[data["fact"]["wind_dir"]]}')
         print(f'Давление: {data["fact"]["pressure_mm"]} мм рт. ст.')
         print(f'Влажность: {data["fact"]["humidity"]} %')
-        print(f'Погодное описание: {data["fact"]["condition"]}')
+        print(f'Погодное описание: {condition[data["fact"]["condition"]]}')
     else:
         # Выводим код ошибки
         print(f'Ошибка: {yandex_req.status_code}')
