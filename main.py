@@ -8,79 +8,86 @@ import config
 bot = telebot.TeleBot(config.token_tg_bot)
 address = ['Ул. Проектируемая, 1', 'Ул. Светлая, 3 к. 2', 'Пр. Фрунзе, 73', 'Ул. Академика Колмогорова, 11']
 
+import requests
 
-@bot.message_handler(commands=["start"])
-def start(message):
-    keyboard = types.ReplyKeyboardMarkup()
-    button_geo = types.KeyboardButton(text="Автоматически", request_location=True)
-    button_choise = types.KeyboardButton(text="Вручную")
-    keyboard.add(button_geo)
-    keyboard.add(button_choise)
-    bot.send_message(message.chat.id, f"Для передачи погоды, выбери способ определения местоложения",
-                     reply_markup=keyboard)
+# Задаем координаты населенного пункта
+lat = 55.75396  # широта Москвы
+lon = 37.620393  # долгота Москвы
 
+# Задаем параметры запроса
+params = {
+    'lat': lat,
+    'lon': lon,
+    'lang': 'ru_RU',  # язык ответа
+    'limit': 7,  # срок прогноза в днях
+    'hours': True,  # наличие почасового прогноза
+    'extra': False  # подробный прогноз осадков
+}
 
-@bot.message_handler(content_types=["location"])
-def location(message):
-    if message.location is not None:
-        print(message.location)
-        print("latitude: %s; longitude: %s" % (message.location.latitude, message.location.longitude))
-        bot.send_message(message.chat.id, text=f'{message.location.latitude}, {message.location.longitude}')
-        start(message)
+# Задаем значение ключа API
+api_key = config.token_yandex_api
 
+# Задаем URL API
+url = 'https://api.weather.yandex.ru/v2/forecast'
 
-@bot.message_handler(content_types=['text'])
-def func(message):
-    if message.text == "Вручную":
-        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        [markup.add(types.KeyboardButton(x)) for x in address]
-        bot.send_message(message.chat.id, text="Выберите ближайшее местоположение", reply_markup=markup)
-    elif message.text in address:
-        bot.send_message(message.chat.id, message.text)
-        # 57.566729, 39.935673
-        bot.send_message(message.chat.id, yandex_weather(57.566729, 39.935673, config.token_yandex_api))
-        start(message)
-    else:
-        bot.send_message(message.chat.id, text="На такую комманду я не запрограммировал..")
+# Делаем запрос к API
+response = requests.get(url, params=params, headers={'X-Yandex-API-Key': api_key})
 
+# Проверяем статус ответа
+if response.status_code == 200:
+    # Преобразуем ответ в JSON формат
+    data = response.json()
+    # Выводим данные о текущей погоде
+    print(f'Температура воздуха: {data["fact"]["temp"]} °C')
+    print(f'Ощущается как: {data["fact"]["feels_like"]} °C')
+    print(f'Скорость ветра: {data["fact"]["wind_speed"]} м/с')
+    print(f'Давление: {data["fact"]["pressure_mm"]} мм рт. ст.')
+    print(f'Влажность: {data["fact"]["humidity"]} %')
+    print(f'Погодное описание: {data["fact"]["condition"]}')
+else:
+    # Выводим код ошибки
+    print(f'Ошибка: {response.status_code}')
 
-def yandex_weather(latitude, longitude, token_yandex: str):
-    url_yandex = 'https://api.weather.yandex.ru/v2/informers?lat=55.75396&lon=37.620393'
-    yandex_req = req.get(url=url_yandex, headers={'X-Yandex-API-Key': token_yandex})
-    return yandex_req.text
-    # conditions = {'clear': 'ясно', 'partly-cloudy': 'малооблачно', 'cloudy': 'облачно с прояснениями',
-    #               'overcast': 'пасмурно', 'drizzle': 'морось', 'light-rain': 'небольшой дождь',
-    #               'rain': 'дождь', 'moderate-rain': 'умеренно сильный', 'heavy-rain': 'сильный дождь',
-    #               'continuous-heavy-rain': 'длительный сильный дождь', 'showers': 'ливень',
-    #               'wet-snow': 'дождь со снегом', 'light-snow': 'небольшой снег', 'snow': 'снег',
-    #               'snow-showers': 'снегопад', 'hail': 'град', 'thunderstorm': 'гроза',
-    #               'thunderstorm-with-rain': 'дождь с грозой', 'thunderstorm-with-hail': 'гроза с градом'
-    #               }
-    # wind_dir = {'nw': 'северо-западное', 'n': 'северное', 'ne': 'северо-восточное', 'e': 'восточное',
-    #             'se': 'юго-восточное', 's': 'южное', 'sw': 'юго-западное', 'w': 'западное', 'с': 'штиль'}
-    #
-    # yandex_json = json.loads(yandex_req.text)
-    # yandex_json['fact']['condition'] = conditions[yandex_json['fact']['condition']]
-    # yandex_json['fact']['wind_dir'] = wind_dir[yandex_json['fact']['wind_dir']]
-    # for parts in yandex_json['forecast']['parts']:
-    #     parts['condition'] = conditions[parts['condition']]
-    #     parts['wind_dir'] = wind_dir[parts['wind_dir']]
-    #
-    # pogoda = dict()
-    # params = ['condition', 'wind_dir', 'pressure_mm', 'humidity']
-    # for parts in yandex_json['forecast']['parts']:
-    #     pogoda[parts['part_name']] = dict()
-    #     pogoda[parts['part_name']]['temp'] = parts['temp_avg']
-    #     for param in params:
-    #         pogoda[parts['part_name']][param] = parts[param]
-    #
-    # pogoda['fact'] = dict()
-    # pogoda['fact']['temp'] = yandex_json['fact']['temp']
-    # for param in params:
-    #     pogoda['fact'][param] = yandex_json['fact'][param]
-    #
-    # pogoda['link'] = yandex_json['info']['url']
-    # return pogoda
-
-
-bot.polling(none_stop=True)
+# @bot.message_handler(commands=["start"])
+# def start(message):
+#     keyboard = types.ReplyKeyboardMarkup()
+#     button_geo = types.KeyboardButton(text="Автоматически", request_location=True)
+#     button_choise = types.KeyboardButton(text="Вручную")
+#     keyboard.add(button_geo)
+#     keyboard.add(button_choise)
+#     bot.send_message(message.chat.id, f"Для передачи погоды, выбери способ определения местоложения",
+#                      reply_markup=keyboard)
+#
+#
+# @bot.message_handler(content_types=["location"])
+# def location(message):
+#     if message.location is not None:
+#         print(message.location)
+#         print("latitude: %s; longitude: %s" % (message.location.latitude, message.location.longitude))
+#         bot.send_message(message.chat.id, text=f'{message.location.latitude}, {message.location.longitude}')
+#         start(message)
+#
+#
+# @bot.message_handler(content_types=['text'])
+# def func(message):
+#     if message.text == "Вручную":
+#         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+#         [markup.add(types.KeyboardButton(x)) for x in address]
+#         bot.send_message(message.chat.id, text="Выберите ближайшее местоположение", reply_markup=markup)
+#     elif message.text in address:
+#         bot.send_message(message.chat.id, message.text)
+#         # 57.566729, 39.935673
+#         bot.send_message(message.chat.id, yandex_weather(57.566729, 39.935673, config.token_yandex_api))
+#         start(message)
+#     else:
+#         bot.send_message(message.chat.id, text="На такую комманду я не запрограммировал..")
+#
+#
+# def yandex_weather(latitude, longitude, token_yandex: str):
+#     url_yandex = f'https://api.weather.yandex.ru/v2/informers/?lat={latitude}&lon={longitude}&[lang=ru_RU]'
+#     yandex_req = req.get(url_yandex, headers={'X-Yandex-API-Key': token_yandex}, verify=False)
+#
+#     return yandex_req
+#
+#
+# bot.polling(none_stop=True)
