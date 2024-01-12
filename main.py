@@ -49,7 +49,8 @@ def start(message):
 @bot.message_handler(content_types=["location"])
 def location(message):
     if message.location is not None:
-        bot.send_message(message.chat.id, yandex_weather(message.location.latitude, message.location.longitude))
+        bot.send_message(message.chat.id,
+                         yandex_weather(message.location.latitude, message.location.longitude))
         start(message)
 
 
@@ -80,17 +81,16 @@ def yandex_weather(latitude, longitude):
     if yandex_req.status_code == 200:
         # Преобразуем ответ в JSON формат
         data = yandex_req.json()
-        print(f'Температура воздуха: {data["fact"]["temp"]} °C')
-        print(f'Ощущается как: {data["fact"]["feels_like"]} °C')
-        print(f'Скорость ветра: {data["fact"]["wind_speed"]} м/с')
-        print(f'Направление ветра: {wind_dir[data["fact"]["wind_dir"]]}')
-        print(f'Давление: {data["fact"]["pressure_mm"]} мм рт. ст.')
-        print(f'Влажность: {data["fact"]["humidity"]} %')
-        print(f'Погодное описание: {condition[data["fact"]["condition"]]}')
     else:
         # Выводим код ошибки
         print(f'Ошибка: {yandex_req.status_code}')
-    return data["fact"]["temp"]
+    return f'Температура воздуха: {data["fact"]["temp"]} °C' + '\n' + \
+           f'Ощущается как: {data["fact"]["feels_like"]} °C' + '\n' + \
+           f'Скорость ветра: {data["fact"]["wind_speed"]} м/с' + '\n' + \
+           f'Направление ветра: {wind_dir[data["fact"]["wind_dir"]]}' + '\n' + \
+           f'Давление: {data["fact"]["pressure_mm"]} мм рт. ст.' + '\n' + \
+           f'Влажность: {data["fact"]["humidity"]} %' + '\n' + \
+           f'Погодное описание: {condition[data["fact"]["condition"]]}'
 
 
 bot.polling(none_stop=True)
