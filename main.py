@@ -2,6 +2,9 @@ import telebot;
 from telebot import types
 import requests
 import config
+from geopy.geocoders import Nominatim
+import gspread
+from datetime import datetime
 
 bot = telebot.TeleBot(config.token_tg_bot)
 api_key = config.token_yandex_api
@@ -51,6 +54,9 @@ def location(message):
     if message.location is not None:
         bot.send_message(message.chat.id,
                          yandex_weather(message.location.latitude, message.location.longitude))
+        geolocator = Nominatim(user_agent="my_geocoder")
+        mylocation = geolocator.reverse((message.location.latitude, message.location.longitude), language="ru")
+        bot.send_message(message.chat.id, mylocation.address)
         start(message)
 
 
@@ -64,7 +70,7 @@ def func(message):
         bot.send_message(message.chat.id, yandex_weather(57.566729, 39.935673))
         start(message)
     else:
-        bot.send_message(message.chat.id, text="На такую комманду я не запрограммировал..")
+        bot.send_message(message.chat.id, text="На такую комманду я не запрограммирован..")
 
 
 def yandex_weather(latitude, longitude):
@@ -84,13 +90,28 @@ def yandex_weather(latitude, longitude):
     else:
         # Выводим код ошибки
         print(f'Ошибка: {yandex_req.status_code}')
+
+    google_write(data)
     return f'Температура воздуха: {data["fact"]["temp"]} °C' + '\n' + \
-           f'Ощущается как: {data["fact"]["feels_like"]} °C' + '\n' + \
-           f'Скорость ветра: {data["fact"]["wind_speed"]} м/с' + '\n' + \
-           f'Направление ветра: {wind_dir[data["fact"]["wind_dir"]]}' + '\n' + \
-           f'Давление: {data["fact"]["pressure_mm"]} мм рт. ст.' + '\n' + \
-           f'Влажность: {data["fact"]["humidity"]} %' + '\n' + \
-           f'Погодное описание: {condition[data["fact"]["condition"]]}'
+        f'Ощущается как: {data["fact"]["feels_like"]} °C' + '\n' + \
+        f'Скорость ветра: {data["fact"]["wind_speed"]} м/с' + '\n' + \
+        f'Направление ветра: {wind_dir[data["fact"]["wind_dir"]]}' + '\n' + \
+        f'Давление: {data["fact"]["pressure_mm"]} мм рт. ст.' + '\n' + \
+        f'Влажность: {data["fact"]["humidity"]} %' + '\n' + \
+        f'Описание погоды: {condition[data["fact"]["condition"]]}'
+
+
+def google_write(data) -> None:
+    # Указываем путь к JSON
+    gc = gspread.service_account(filename='credentials.json')
+    # Открываем таблицу для записи
+    sh = gc.open("air_quality_measurement")
+    nextcol = len(sh.sheet1.col_values(2)) + 1
+    sh.sheet1.update(values=[[int(sh.sheet1.cell(nextcol - 1, 1).value) + 1, datetime.now().strftime('%H:%M:%S'),
+                              datetime.now().strftime('%d.%m.%Y'), 'адрес', data["fact"]["temp"],
+                              data["fact"]["wind_speed"],
+                              wind_dir[data["fact"]["wind_dir"]], data["fact"]["pressure_mm"], data["fact"]["humidity"],
+                              condition[data["fact"]["condition"]]]], range_name=f'A{nextcol}:J{nextcol}')
 
 
 bot.polling(none_stop=True)
