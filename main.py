@@ -42,7 +42,9 @@ condition = {
 smelltype = ['Нефтепродуктами', 'Химией', 'Канализацией']
 currentweather = []
 currentuser = 'currentuser'
-mylocation = 'mylocation'
+myaddress = 'myaddress'
+mycoordinates = 'mycoordinates'
+lastmessage = ''
 
 
 @bot.message_handler(commands=["start"])
@@ -57,33 +59,38 @@ def start(message):
 
 @bot.message_handler(content_types=["location"])
 def location(message):
-    global mylocation
+    global mycoordinates
     if message.location is not None:
-        mylocation = (message.location.latitude, message.location.longitude)
+        mycoordinates = (message.location.latitude, message.location.longitude)
     smell(message)
 
 
 @bot.message_handler(content_types=['text'])
 def func(message):
-    global mylocation, currentweather
-    if message.text == "Вручную":
+    global mycoordinates, currentweather, lastmessage
+    if message.text == "Вручную" and lastmessage != message.text:
+        lastmessage = message.text
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         [markup.add(types.KeyboardButton(x)) for x in address.keys()]
         bot.send_message(message.chat.id, text="Выберите ближайшее местоположение", reply_markup=markup)
-    elif message.text in address:
-        mylocation = ([address[message.text][0], address[message.text][1]])
+    elif message.text in address and lastmessage != message.text:
+        lastmessage = message.text
+        mycoordinates = ([address[message.text][0], address[message.text][1]])
         smell(message)
-    elif message.text in smelltype:
-        yandex_weather(*mylocation)
+    elif message.text in smelltype and lastmessage != message.text:
+        lastmessage = message.text
+        bot.send_message(message.chat.id, 'Ожидайте, передаю данные', reply_markup=types.ReplyKeyboardRemove())
+        yandex_weather(*mycoordinates)
         google_write(message.text)
-        bot.send_message(message.chat.id, f'Переданы следующие данные:' + '\n' + \
-                         f'Запах: {message.text}' + '\n' + \
+        bot.send_message(message.chat.id, f'По данным сервиса Яндекс Погода' + '\n' + \
+                         f'Переданы следующие данные:' + '\n' + \
                          f'Температура воздуха: {currentweather[0]} °C' + '\n' + \
                          f'Скорость ветра: {currentweather[1]} м/с' + '\n' + \
                          f'Направление ветра: {currentweather[2]}' + '\n' + \
                          f'Давление: {currentweather[3]} мм рт. ст.' + '\n' + \
                          f'Влажность: {currentweather[4]} %' + '\n' + \
-                         f'Описание погоды: {currentweather[5]}')
+                         f'Описание погоды: {currentweather[5]}' + '\n' + \
+                         f'Запах: {message.text}')
         start(message)
     else:
         bot.send_message(message.chat.id, text="Используйте кнопки")
@@ -114,9 +121,9 @@ def yandex_weather(latitude, longitude):
     else:
         # Выводим код ошибки
         print(f'Ошибка: {yandex_req.status_code}')
-    global mylocation, currentweather
+    global myaddress, currentweather
     geolocator = Nominatim(user_agent="my_geocoder")
-    mylocation = geolocator.reverse((latitude, longitude), language="ru")
+    myaddress = geolocator.reverse((latitude, longitude), language="ru")
     currentweather = [data["fact"]["temp"], data["fact"]["wind_speed"], wind_dir[data["fact"]["wind_dir"]],
                       data["fact"]["pressure_mm"], data["fact"]["humidity"], condition[data["fact"]["condition"]]]
     return f'Температура воздуха: {data["fact"]["temp"]} °C' + '\n' + \
@@ -129,7 +136,7 @@ def yandex_weather(latitude, longitude):
 
 
 def google_write(mysmell) -> None:
-    global currentuser, currentweather
+    global currentuser, currentweather, myaddress
     # Указываем путь к JSON
     gc = gspread.service_account(filename='credentials.json')
     # Открываем таблицу для записи
@@ -138,7 +145,7 @@ def google_write(mysmell) -> None:
     sh.sheet1.update(values=[[int(sh.sheet1.cell(nextcol - 1, 1).value) + 1,
                               datetime.now().strftime('%H:%M:%S'),
                               datetime.now().strftime('%d.%m.%Y'),
-                              mylocation.address.split(',')[1] + ' ' + mylocation.address.split(',')[0],
+                              myaddress.address.split(',')[1] + ' ' + myaddress.address.split(',')[0],
                               currentweather[0], currentweather[1], currentweather[2], currentweather[3],
                               currentweather[4], currentweather[5],
                               currentuser,
